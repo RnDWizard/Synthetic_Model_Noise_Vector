@@ -81,9 +81,3 @@ plt.savefig("Wedge model "+synth_title,dpi=300)
 
 
 print ("BING...Done!")
-
-
-# Come back to this
-# for row in velocity:
-#     row = row * (random.randint(1,2))
-#     print (row.mean())
