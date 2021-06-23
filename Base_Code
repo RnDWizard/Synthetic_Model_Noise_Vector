@@ -1,0 +1,89 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from fatiando.seismic import conv
+from fatiando.vis import mpl
+import random
+
+
+# Set Parameters of Model
+host_vp = 3573
+wedge_vp = 4366
+host_rho = 2510
+wedge_rho = 2510
+host_AI = host_vp * host_rho
+wedge_AI = wedge_vp * wedge_rho
+# Wavelet and sample funciton
+ricker_freq = 80
+dt = 2e-5
+# Add percentage noise (must be a float)
+noise_pct = 10.0
+
+
+
+# Define the parameters of our depth model
+n_samples, n_traces = [150, 100]
+velocity = host_vp*np.ones((n_samples, n_traces))
+density = host_rho*np.ones((n_samples, n_traces))
+acousic_imp = host_AI*np.ones((n_samples, n_traces))
+# Enter Block Values
+velocity[40:100, :] = wedge_vp
+density[40:100,:] = wedge_rho
+acousic_imp[40:100,:] = wedge_AI
+
+
+a = float(-1 * (noise_pct/100))
+b = float(noise_pct/100)
+
+noise_vector = np.zeros([150,1])
+for i, j in enumerate(noise_vector):
+    noise_vector[i] = j + random.uniform(a,b)
+
+noise_vector = noise_vector * model_average
+
+
+# Multiply values by noise vector
+velocity = velocity + noise_vector
+print (velocity)
+acousic_imp = velocity * density
+
+# We need to convert the depth model we made above into time
+vel_l = conv.depth_2_time(velocity, velocity, dt=dt, dz=1)
+rho_l = conv.depth_2_time(velocity, density, dt=dt, dz=1)
+
+# With that, we can calculate the reflectivity model in time
+rc = conv.reflectivity(vel_l, rho_l)
+# and finally perform our convolution
+synt = conv.convolutional_model(rc, ricker_freq, conv.rickerwave, dt=dt)
+
+# We can use the utility function in fatiando.vis.mpl to plot the seismogram
+fig, axes = plt.subplots(1, 2, figsize=(10, 6))
+
+ax = axes[0]
+ax.set_title("AI: Salt in Clay (in depth)")
+tmp = ax.imshow(acousic_imp, extent=[0, n_traces, n_samples, 0],
+                cmap="viridis", aspect='auto', origin='upper')
+fig.colorbar(tmp, ax=ax, pad=0, aspect=50)
+ax.set_xlabel('Trace')
+ax.set_ylabel('Depth (m)')
+
+ax = axes[1]
+noise_pct_title = int(noise_pct)
+
+synth_title = "Zero Offset Synthetic + {}pct Noise - {}Hz Ricker".format(noise_pct_title,ricker_freq)
+ax.set_title(synth_title)
+mpl.seismic_wiggle(synt[:, ::20], dt, scale=1)
+mpl.seismic_image(synt, dt, cmap="RdBu_r", aspect='auto')
+ax.set_xlabel('Trace')
+ax.set_ylabel('Time (s)')
+plt.tight_layout()
+
+plt.savefig("Wedge model "+synth_title,dpi=300)
+
+
+print ("BING...Done!")
+
+
+# Come back to this
+# for row in velocity:
+#     row = row * (random.randint(1,2))
+#     print (row.mean())
